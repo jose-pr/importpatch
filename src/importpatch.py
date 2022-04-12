@@ -80,17 +80,17 @@ def cleanup():
         _SHIM.unlink(missing_ok=True)
 
 
-def add(patch: str, src: "str"):
-    srcs = MODULES_TO_PATCH.setdefault(patch, [])
+def add(target: str, src: "str"):
+    srcs = MODULES_TO_PATCH.setdefault(target, [])
     if src not in srcs:
         srcs.append(src)
 
 
-def rm(patch: str, src: "str|None"):
-    if src is None and patch in MODULES_TO_PATCH:
+def rm(target: str, src: "str|None"):
+    if src is None and target in MODULES_TO_PATCH:
         MODULES_TO_PATCH[src].clear()
     elif src:
-        srcs = MODULES_TO_PATCH.get(patch, [])
+        srcs = MODULES_TO_PATCH.get(target, [])
         while src in srcs:
             srcs.remove(src)
 
