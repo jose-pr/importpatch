@@ -1,4 +1,3 @@
-from ast import parse
 import atexit
 import importlib
 from importlib.abc import MetaPathFinder
@@ -13,6 +12,7 @@ from typing import Sequence
 MODULES_TO_PATCH: "dict[str,list[str]]" = {}
 _FILE = Path(__file__)
 _SHIM = _FILE.with_suffix(".pth")
+_IMPORTED = False
 
 
 class ImportPatchLoader(SourceFileLoader):
@@ -43,25 +43,26 @@ class ImportPatchFinder(MetaPathFinder):
             else:
                 name = fullname
             for entry in path:
-                name: Path = Path(entry).joinpath(name)
-                if name.is_dir():
-                    submodules = [name]
-                    filename = name.joinpath("__init__.py")
+                filename: Path = Path(entry).joinpath(name)
+                if filename.is_dir():
+                    submodules = [str(filename)]
+                    filename = filename.joinpath("__init__.py")
                 else:
-                    filename = name.with_suffix(".py")
+                    filename = filename.with_suffix(".py")
                     submodules = None
                 if not filename.exists():
                     continue
                 return spec_from_file_location(
                     fullname,
-                    filename,
-                    loader=ImportPatchLoader(fullname, filename),
+                    str(filename),
+                    loader=ImportPatchLoader(fullname, str(filename)),
                     submodule_search_locations=submodules,
                 )
         return None
 
 
 def inject():
+    global _IMPORTED
     try:
         import json
 
@@ -71,8 +72,10 @@ def inject():
                 MODULES_TO_PATCH.update(json.loads(path.read_text()))
     except:
         pass
-    sys.meta_path.insert(0, ImportPatchFinder())
-    atexit.register(cleanup)
+    if not _IMPORTED:
+        sys.meta_path.insert(0, ImportPatchFinder())
+        atexit.register(cleanup)
+        _IMPORTED = True
 
 
 def cleanup():
@@ -80,17 +83,17 @@ def cleanup():
         _SHIM.unlink(missing_ok=True)
 
 
-def add(target: str, src: "str"):
-    srcs = MODULES_TO_PATCH.setdefault(target, [])
+def add(patch: str, src: "str"):
+    srcs = MODULES_TO_PATCH.setdefault(patch, [])
     if src not in srcs:
         srcs.append(src)
 
 
-def rm(target: str, src: "str|None"):
-    if src is None and target in MODULES_TO_PATCH:
+def rm(patch: str, src: "str|None"):
+    if src is None and patch in MODULES_TO_PATCH:
         MODULES_TO_PATCH[src].clear()
     elif src:
-        srcs = MODULES_TO_PATCH.get(target, [])
+        srcs = MODULES_TO_PATCH.get(patch, [])
         while src in srcs:
             srcs.remove(src)
 
